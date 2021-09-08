@@ -1,4 +1,8 @@
 import asyncHandler from 'express-async-handler';
+import Stripe from 'stripe';
+const stripe = new Stripe(
+  'sk_test_51J7EykGHksnS4US2QxEKkypH8G7pw447MLGH01Qa7Q7RffVOZmtPBoF5iEDq26QwnL6UYLWYmcTbSPo57I38yuOy0089Pymomd'
+);
 import Order from '../models/orderModel.js';
 
 // @desc    create new order
@@ -6,65 +10,111 @@ import Order from '../models/orderModel.js';
 // @access    Private
 
 const createOrder = asyncHandler(async (req, res) => {
-    const {orderItems, shippingAddress, paymentMethod, ItemPrice, taxPrice, shippingPrice, totalPrice} = req.body
+  const {
+    orderItems,
+    shippingAddress,
+    paymentMethod,
+    ItemPrice,
+    taxPrice,
+    shippingPrice,
+    totalPrice,
+  } = req.body;
 
-    if (orderItems && orderItems.length === 0) {
-        res.status(400)
-        throw new Error('no order items')
-        return
-    } else {
-        const order = new Order({
-            user: req.user._id,
-            orderItems,
-            shippingAddress, 
-            paymentMethod, 
-            ItemPrice, 
-            taxPrice, 
-            shippingPrice, 
-            totalPrice
-        })
+  if (orderItems && orderItems.length === 0) {
+    res.status(400);
+    throw new Error('no order items');
+    return;
+  } else {
+    const order = new Order({
+      user: req.user._id,
+      orderItems,
+      shippingAddress,
+      paymentMethod,
+      ItemPrice,
+      taxPrice,
+      shippingPrice,
+      totalPrice,
+    });
 
-        const createdOrder = await order.save();
+    const createdOrder = await order.save();
 
-        res.status(201).json(createdOrder)
-    }
-})
+    res.status(201).json(createdOrder);
+  }
+});
 
 // @desc    get order by id
 // @route    get /api/orders/:id
 // @access    Private
 const getOrderById = asyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id).populate('user', 'name email')
-    if (order) {
-        res.json(order)
-    } else {
-        res.status(404)
-        throw new Error('order does not exist');
-    }
-})
+  const order = await Order.findById(req.params.id).populate(
+    'user',
+    'name email'
+  );
+  if (order) {
+    res.json(order);
+  } else {
+    res.status(404);
+    throw new Error('order does not exist');
+  }
+});
 
 // @desc    update order to paid
 // @route    get /api/orders/:id/pay
 // @access    Private
-const updateOrderToPaid = asyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id)
-    if (order) {
-        order.isPaid = true
-        order.paidAt = Date.now()
-        order.paymentResult = {
-            id: req.body.id,
-            status: req.body.status,
-            update_time: req.body.update_time,
-            email_address: req.body.payer.email_address
-        }
+// const updateOrderToPaid = asyncHandler(async (req, res) => {
+//     const order = await Order.findById(req.params.id)
+//     if (order) {
+//         order.isPaid = true
+//         order.paidAt = Date.now()
+//         order.paymentResult = {
+//             id: req.body.id,
+//             status: req.body.status,
+//             update_time: req.body.update_time,
+//             email_address: req.body.payer.email_address
+//         }
 
-        const updatedOrder = await order.save()
+//         const updatedOrder = await order.save()
 
-        res.json(updatedOrder)
-    } else {
-        res.status(404)
-        throw new Error('order does not exist');
-    }
-})
+//         res.json(updatedOrder)
+//     } else {
+//         res.status(404)
+//         throw new Error('order does not exist');
+//     }
+// })
 
-export {createOrder, getOrderById,updateOrderToPaid}
+// @desc    pay order route (stripe)
+// @route    post /api/orders/:id/pay
+// @access    Private
+const payOrder = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (order) {
+    const amount = order.totalPrice;
+    const currency = 'usd';
+
+    const session = await stripe.paymentIntents.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency,
+            unit_amount: amount,
+          },
+        },
+      ],
+      mode: 'payment',
+    });
+
+    order.isPaid = true;
+    order.paidAt = Date.now();
+
+    const updatedOrder = await order.save();
+
+    res.json({ id: session.id });
+  } else {
+    res.status(404);
+    throw new Error('order does not exist');
+  }
+});
+
+export { createOrder, getOrderById, payOrder };
