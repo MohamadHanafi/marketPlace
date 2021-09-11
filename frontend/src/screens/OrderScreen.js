@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Col, Row, ListGroup, Image, Card } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
@@ -6,11 +6,8 @@ import Loader from '../components/Loader';
 
 import Message from '../components/Message';
 import { getOrderDetails } from '../actions/orderActions';
-import StripeCard from '../components/StripeCard';
 
-const OrderScreen = ({ match }) => {
-  const [showCheckout, setShowCheckout] = useState(false);
-
+const OrderScreen = ({ match, history }) => {
   const orderId = match.params.id;
 
   const dispatch = useDispatch();
@@ -138,21 +135,19 @@ const OrderScreen = ({ match }) => {
                   <Col>${order.totalPrice}</Col>
                 </Row>
               </ListGroup.Item>
-              <ListGroup.Item>
-                <Button
-                  className='btn-block'
-                  onClick={() => setShowCheckout(!showCheckout)}
-                >
-                  Checkout
-                </Button>
-              </ListGroup.Item>
+
+              {!order.isPaid && (
+                <ListGroup.Item>
+                  <Button
+                    className='btn-block'
+                    onClick={() => history.push(`/order/${orderId}/checkout`)}
+                  >
+                    Checkout
+                  </Button>
+                </ListGroup.Item>
+              )}
             </ListGroup>
           </Card>
-          {showCheckout ? (
-            <Card style={{ marginTop: '20px' }}>
-              <StripeCard />
-            </Card>
-          ) : null}
         </Col>
       </Row>
     </>

@@ -1,4 +1,3 @@
-import { loadStripe } from '@stripe/stripe-js';
 import axios from 'axios';
 import {
   ORDER_CREATE_FAIL,
@@ -10,6 +9,9 @@ import {
   ORDER_PAY_FAIL,
   ORDER_PAY_REQUEST,
   ORDER_PAY_SUCCESS,
+  ORDER_LIST_MY_REQUEST,
+  ORDER_LIST_MY_SUCCESS,
+  ORDER_LIST_MY_FAIL,
 } from '../constants/orderConstants';
 
 export const createOrder = (order) => async (dispatch, getState) => {
@@ -82,9 +84,6 @@ export const getOrderDetails = (id) => async (dispatch, getState) => {
 export const payOrder =
   (orderId, paymentResult) => async (dispatch, getState) => {
     try {
-      const stripePromise = loadStripe(
-        'pk_test_51J7EykGHksnS4US2yXqoORb7QjSHgzD77JO6DCsnT61OgZAC01G2qFvuyzgWlITZSjCCGbzLyZKYS4PmaJUGK0w000FJzADG3f'
-      );
       dispatch({
         type: ORDER_PAY_REQUEST,
       });
@@ -100,26 +99,15 @@ export const payOrder =
         },
       };
 
-      const stripe = await stripePromise;
-
-      const response = await axios.put(
+      const { data } = await axios.put(
         `/api/orders/${orderId}/pay`,
         paymentResult,
         config
       );
 
-      const session = await response.json();
-
-      const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
       dispatch({
         type: ORDER_PAY_SUCCESS,
+        payload: data,
       });
     } catch (error) {
       dispatch({
@@ -131,3 +119,37 @@ export const payOrder =
       });
     }
   };
+
+export const listMyOrders = () => async (dispatch, getState) => {
+  try {
+    dispatch({
+      type: ORDER_LIST_MY_REQUEST,
+    });
+
+    const {
+      userLogin: { userInfo },
+    } = getState();
+
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    };
+
+    const { data } = await axios.get(`/api/orders/myorders`, config);
+
+    dispatch({
+      type: ORDER_LIST_MY_SUCCESS,
+      payload: data,
+    });
+  } catch (error) {
+    dispatch({
+      type: ORDER_LIST_MY_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    });
+  }
+};
