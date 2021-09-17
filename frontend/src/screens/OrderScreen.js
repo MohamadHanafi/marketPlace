@@ -5,14 +5,25 @@ import { useDispatch, useSelector } from 'react-redux';
 import Loader from '../components/Loader';
 
 import Message from '../components/Message';
-import { getOrderDetails } from '../actions/orderActions';
+import { getOrderDetails, deliverOrder } from '../actions/orderActions';
+import { ORDER_DELIVER_RESET } from '../constants/orderConstants';
 
 const OrderScreen = ({ match, history }) => {
   const orderId = match.params.id;
 
   const dispatch = useDispatch();
 
+  const userLogin = useSelector((state) => state.userLogin);
+  const { userInfo } = userLogin;
+
   const { order, loading, error } = useSelector((state) => state.orderDetails);
+
+  const orderDeliver = useSelector((state) => state.orderDeliver);
+  const {
+    loading: loadingDeliver,
+    success: successDeliver,
+    error: errorDeliver,
+  } = orderDeliver;
 
   if (order) {
     // Calculate Prices
@@ -23,10 +34,22 @@ const OrderScreen = ({ match, history }) => {
   }
 
   useEffect(() => {
+    if (!userInfo) {
+      history.push('/login');
+    }
+
+    if (successDeliver) {
+      dispatch({ type: ORDER_DELIVER_RESET });
+      dispatch(getOrderDetails(orderId));
+    }
     if (!order || order._id !== orderId) {
       dispatch(getOrderDetails(orderId));
     }
-  }, [orderId, order, dispatch]);
+  }, [order, dispatch, successDeliver, orderId, userInfo, history]);
+
+  const deliverHandler = () => {
+    dispatch(deliverOrder(order));
+  };
 
   const renderOrderItems = () => {
     return (
@@ -146,6 +169,20 @@ const OrderScreen = ({ match, history }) => {
                   </Button>
                 </ListGroup.Item>
               )}
+              {loadingDeliver && <Loader />}
+              {errorDeliver && (
+                <Message variant='danger'>{errorDeliver}</Message>
+              )}
+              {userInfo &&
+                userInfo.isAdmin &&
+                order.isPaid &&
+                !order.isDelivered && (
+                  <ListGroup.Item>
+                    <Button className='btn btn-block' onClick={deliverHandler}>
+                      Mark as deliver
+                    </Button>
+                  </ListGroup.Item>
+                )}
             </ListGroup>
           </Card>
         </Col>
